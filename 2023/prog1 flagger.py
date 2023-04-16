@@ -230,24 +230,28 @@ def DisplayCurrentState(SourceCode, Memory, Registers):
   DisplayCode(SourceCode, Memory)
   print("*")
   print("*  PC: ", Registers[PC], " ACC: ", Registers[ACC], " TOS: ", Registers[TOS])
-  print("*  Status Register: ZNV")
+  print("*  Status Register: ZNVC")
   print("*                  ", ConvertToBinary(Registers[STATUS]))
   DisplayFrameDelimiter(-1)
   
 def SetFlags(Value, Registers):
   if Value == 0:
-    Registers[STATUS] = ConvertToDecimal("100")
+    Registers[STATUS] = ConvertToDecimal("1000")
   elif Value < 0:
-    Registers[STATUS] = ConvertToDecimal("010")
+    Registers[STATUS] = ConvertToDecimal("0100")
+  elif Value > MAX_INT +1:
+    Registers[STATUS] = ConvertToDecimal("0011")
   elif Value > MAX_INT or Value < -(MAX_INT + 1):
-    Registers[STATUS] = ConvertToDecimal("001")
+    Registers[STATUS] = ConvertToDecimal("0010")
+  
+
   else:
-    Registers[STATUS] = ConvertToDecimal("000")    
+    Registers[STATUS] = ConvertToDecimal("0000")
   return Registers
 
-def ReportRunTimeError(ErrorMessage, Registers): 
+def ReportRunTimeError(ErrorMessage, Registers):
   print("Run time error:", ErrorMessage)
-  #Registers[ERR] = 1
+  Registers[ERR] = 1
   return Registers
  
 def ExecuteLDA(Memory, Registers, Address): 
@@ -267,14 +271,17 @@ def ExecuteLDAimm(Registers, Operand):
 def ExecuteADD(Memory, Registers, Address): 
   Registers[ACC] = Registers[ACC] + Memory[Address].OperandValue
   Registers = SetFlags(Registers[ACC], Registers)
-  if Registers[STATUS] == ConvertToDecimal("001"):
+  if Registers[STATUS] == ConvertToDecimal("0010"):
     ReportRunTimeError("Overflow", Registers)
+  elif Registers[STATUS] == ConvertToDecimal("0011"):
+    ReportRunTimeError("Carry", Registers)
+
   return Registers
 
 def ExecuteSUB(Memory, Registers, Address):
   Registers[ACC] = Registers[ACC] - Memory[Address].OperandValue
   Registers = SetFlags(Registers[ACC], Registers)
-  if Registers[STATUS] == ConvertToDecimal("001"):
+  if Registers[STATUS] == ConvertToDecimal("0010"):
     ReportRunTimeError("Overflow", Registers)
   return Registers
 
