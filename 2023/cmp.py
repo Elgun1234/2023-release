@@ -130,7 +130,7 @@ def ExtractLabel(Instruction, LineNumber, Memory, SymbolTable):
 
 def ExtractOpCode(Instruction, LineNumber, Memory):
     if len(Instruction) > 9:
-        OpCodeValues = ["LDA", "STA", "LDA#", "HLT", "ADD", "JMP", "SUB", "CMP#", "BEQ", "SKP", "JSR", "RTN", "   "]
+        OpCodeValues = ["LDA", "STA", "LDA#", "HLT", "ADD", "JMP", "SUB", "CMP#", "BEQ", "SKP", "JSR", "RTN", "CMP", "   "]
         Operation = Instruction[7:10]
         if len(Instruction) > 10:
             AddressMode = Instruction[10:11]
@@ -227,7 +227,7 @@ def ConvertToBinary(DecimalNumber):
         Bit = str(Remainder)
         BinaryString = Bit + BinaryString
         DecimalNumber = DecimalNumber // 2
-    while len(BinaryString) < 4:
+    while len(BinaryString) < 3:
         BinaryString = '0' + BinaryString
     return BinaryString
 
@@ -252,35 +252,26 @@ def DisplayCurrentState(SourceCode, Memory, Registers):
     DisplayCode(SourceCode, Memory)
     print("*")
     print("*  PC: ", Registers[PC], " ACC: ", Registers[ACC], " TOS: ", Registers[TOS])
-    print("*  Status Register: ZNVC")
+    print("*  Status Register: ZNV")
     print("*                  ", ConvertToBinary(Registers[STATUS]))
     DisplayFrameDelimiter(-1)
 
 
 def SetFlags(Value, Registers):
     if Value == 0:
-        Registers[STATUS] = ConvertToDecimal("1000")
+        Registers[STATUS] = ConvertToDecimal("100")
     elif Value < 0:
-        Registers[STATUS] = ConvertToDecimal("0100")
-    elif Value > MAX_INT + 1:
-        Registers[STATUS] = ConvertToDecimal("0011")
+        Registers[STATUS] = ConvertToDecimal("010")
     elif Value > MAX_INT or Value < -(MAX_INT + 1):
-        Registers[STATUS] = ConvertToDecimal("0010")
-
-
+        Registers[STATUS] = ConvertToDecimal("001")
     else:
-        Registers[STATUS] = ConvertToDecimal("0000")
+        Registers[STATUS] = ConvertToDecimal("000")
     return Registers
 
 
 def ReportRunTimeError(ErrorMessage, Registers):
-    if ErrorMessage == "Carry":
-        print("Run time error:", ErrorMessage)
-    elif ErrorMessage == "Overflow":
-        print("Run time error:", ErrorMessage)
-    else:
-        print("Run time error:", ErrorMessage)
-        Registers[ERR] = 1
+    print("Run time error:", ErrorMessage)
+    Registers[ERR] = 1
     return Registers
 
 
@@ -304,18 +295,15 @@ def ExecuteLDAimm(Registers, Operand):
 def ExecuteADD(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] + Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("001"):
         ReportRunTimeError("Overflow", Registers)
-    elif Registers[STATUS] == ConvertToDecimal("0011"):
-        ReportRunTimeError("Carry", Registers)
-
     return Registers
 
 
 def ExecuteSUB(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] - Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("001"):
         ReportRunTimeError("Overflow", Registers)
     return Registers
 
@@ -325,6 +313,10 @@ def ExecuteCMPimm(Registers, Operand):
     Registers = SetFlags(Value, Registers)
     return Registers
 
+def ExecuteCMPD(Registers, Memory, Address):
+    Value = Registers[ACC] - Memory[Address].OperandValue
+    Registers = SetFlags(Value, Registers)
+    return Registers
 
 def ExecuteBEQ(Registers, Address):
     StatusRegister = ConvertToBinary(Registers[STATUS])
@@ -377,6 +369,9 @@ def Execute(SourceCode, Memory):
     DisplayCurrentState(SourceCode, Memory, Registers)
     OpCode = Memory[Registers[PC]].OpCode
     while OpCode != "HLT":
+        if int(SourceCode[0]) == Registers[TOS]:
+            print("error")
+            break
         FrameNumber += 1
         print()
         DisplayFrameDelimiter(FrameNumber)
@@ -397,6 +392,8 @@ def Execute(SourceCode, Memory):
             Memory, Registers = ExecuteJSR(Memory, Registers, Operand)
         elif OpCode == "CMP#":
             Registers = ExecuteCMPimm(Registers, Operand)
+        elif OpCode == "CMP":
+            Registers = ExecuteCMPD(Registers, Memory, Operand)
         elif OpCode == "BEQ":
             Registers = ExecuteBEQ(Registers, Operand)
         elif OpCode == "SUB":
@@ -405,7 +402,7 @@ def Execute(SourceCode, Memory):
             ExecuteSKP()
         elif OpCode == "RTN":
             Registers = ExecuteRTN(Memory, Registers)
-        if Registers[ERR] == 0:
+        if Registers[ERR] == 0 and OpCode != "HLT":
             OpCode = Memory[Registers[PC]].OpCode
             DisplayCurrentState(SourceCode, Memory, Registers)
         else:

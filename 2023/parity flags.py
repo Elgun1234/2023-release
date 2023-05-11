@@ -252,35 +252,44 @@ def DisplayCurrentState(SourceCode, Memory, Registers):
     DisplayCode(SourceCode, Memory)
     print("*")
     print("*  PC: ", Registers[PC], " ACC: ", Registers[ACC], " TOS: ", Registers[TOS])
-    print("*  Status Register: ZNVC")
+    print("*  Status Register: ZNVP")
     print("*                  ", ConvertToBinary(Registers[STATUS]))
     DisplayFrameDelimiter(-1)
 
 
 def SetFlags(Value, Registers):
     if Value == 0:
-        Registers[STATUS] = ConvertToDecimal("1000")
-    elif Value < 0:
-        Registers[STATUS] = ConvertToDecimal("0100")
-    elif Value > MAX_INT + 1:
-        Registers[STATUS] = ConvertToDecimal("0011")
-    elif Value > MAX_INT or Value < -(MAX_INT + 1):
-        Registers[STATUS] = ConvertToDecimal("0010")
 
+
+        Registers[STATUS] = ConvertToDecimal("1001")
+
+
+    elif Value < 0:
+        bin_value = ConvertToBinary(Value)
+        if bin_value.count("1") % 2 == 0:
+            Registers[STATUS] = ConvertToDecimal("0101")
+
+
+    elif Value > MAX_INT or Value < -(MAX_INT + 1):
+        bin_value = ConvertToBinary(Value)
+        if bin_value.count("1") % 2 == 0:
+            Registers[STATUS] = ConvertToDecimal("0011")
+        else:
+            Registers[STATUS] = ConvertToDecimal("0010")
 
     else:
-        Registers[STATUS] = ConvertToDecimal("0000")
+        bin_value = ConvertToBinary(Value)
+        if bin_value.count("1") % 2 == 0:
+            Registers[STATUS] = ConvertToDecimal("0001")
+        else:
+            Registers[STATUS] = ConvertToDecimal("0000")
+
     return Registers
 
 
 def ReportRunTimeError(ErrorMessage, Registers):
-    if ErrorMessage == "Carry":
-        print("Run time error:", ErrorMessage)
-    elif ErrorMessage == "Overflow":
-        print("Run time error:", ErrorMessage)
-    else:
-        print("Run time error:", ErrorMessage)
-        Registers[ERR] = 1
+    print("Run time error:", ErrorMessage)
+    Registers[ERR] = 1
     return Registers
 
 
@@ -304,18 +313,15 @@ def ExecuteLDAimm(Registers, Operand):
 def ExecuteADD(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] + Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("0011") or Registers[STATUS] == ConvertToDecimal("0010"):
         ReportRunTimeError("Overflow", Registers)
-    elif Registers[STATUS] == ConvertToDecimal("0011"):
-        ReportRunTimeError("Carry", Registers)
-
     return Registers
 
 
 def ExecuteSUB(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] - Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("001"):
         ReportRunTimeError("Overflow", Registers)
     return Registers
 
@@ -328,6 +334,7 @@ def ExecuteCMPimm(Registers, Operand):
 
 def ExecuteBEQ(Registers, Address):
     StatusRegister = ConvertToBinary(Registers[STATUS])
+    Registers = SetFlags(Registers[ACC], Registers)
     FlagZ = StatusRegister[0]
     if FlagZ == "1":
         Registers[PC] = Address
@@ -336,6 +343,7 @@ def ExecuteBEQ(Registers, Address):
 
 def ExecuteJMP(Registers, Address):
     Registers[PC] = Address
+    Registers = SetFlags(Registers[ACC], Registers)
     return Registers
 
 
@@ -377,6 +385,9 @@ def Execute(SourceCode, Memory):
     DisplayCurrentState(SourceCode, Memory, Registers)
     OpCode = Memory[Registers[PC]].OpCode
     while OpCode != "HLT":
+        if int(SourceCode[0]) == Registers[TOS]:
+            print("error")
+            break
         FrameNumber += 1
         print()
         DisplayFrameDelimiter(FrameNumber)
@@ -405,7 +416,7 @@ def Execute(SourceCode, Memory):
             ExecuteSKP()
         elif OpCode == "RTN":
             Registers = ExecuteRTN(Memory, Registers)
-        if Registers[ERR] == 0:
+        if Registers[ERR] == 0 and OpCode != "HLT":
             OpCode = Memory[Registers[PC]].OpCode
             DisplayCurrentState(SourceCode, Memory, Registers)
         else:

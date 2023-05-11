@@ -73,6 +73,7 @@ def LoadFile(SourceCode):
     try:
         FileIn = open(FileName + ".txt", 'r')
         FileExists = True
+        lines = len(FileIn.readlines())
         Instruction = FileIn.readline()
         while Instruction != EMPTY_STRING:
             LineNumber += 1
@@ -88,11 +89,14 @@ def LoadFile(SourceCode):
             SourceCode[0] = str(LineNumber - 1)
     if LineNumber > 0:
         DisplaySourceCode(SourceCode)
-    return SourceCode
+    return SourceCode, lines
 
 
-def EditSourceCode(SourceCode):
+def EditSourceCode(SourceCode, MaxLin):
     LineNumber = int(input("Enter line number of code to edit: "))
+    if MaxLin < LineNumber:
+        while MaxLin < LineNumber:
+            LineNumber = int(input("Enter line number of code to edit: "))
     print(SourceCode[LineNumber])
     Choice = EMPTY_STRING
     while Choice != "C":
@@ -227,7 +231,7 @@ def ConvertToBinary(DecimalNumber):
         Bit = str(Remainder)
         BinaryString = Bit + BinaryString
         DecimalNumber = DecimalNumber // 2
-    while len(BinaryString) < 4:
+    while len(BinaryString) < 3:
         BinaryString = '0' + BinaryString
     return BinaryString
 
@@ -252,35 +256,26 @@ def DisplayCurrentState(SourceCode, Memory, Registers):
     DisplayCode(SourceCode, Memory)
     print("*")
     print("*  PC: ", Registers[PC], " ACC: ", Registers[ACC], " TOS: ", Registers[TOS])
-    print("*  Status Register: ZNVC")
+    print("*  Status Register: ZNV")
     print("*                  ", ConvertToBinary(Registers[STATUS]))
     DisplayFrameDelimiter(-1)
 
 
 def SetFlags(Value, Registers):
     if Value == 0:
-        Registers[STATUS] = ConvertToDecimal("1000")
+        Registers[STATUS] = ConvertToDecimal("100")
     elif Value < 0:
-        Registers[STATUS] = ConvertToDecimal("0100")
-    elif Value > MAX_INT + 1:
-        Registers[STATUS] = ConvertToDecimal("0011")
+        Registers[STATUS] = ConvertToDecimal("010")
     elif Value > MAX_INT or Value < -(MAX_INT + 1):
-        Registers[STATUS] = ConvertToDecimal("0010")
-
-
+        Registers[STATUS] = ConvertToDecimal("001")
     else:
-        Registers[STATUS] = ConvertToDecimal("0000")
+        Registers[STATUS] = ConvertToDecimal("000")
     return Registers
 
 
 def ReportRunTimeError(ErrorMessage, Registers):
-    if ErrorMessage == "Carry":
-        print("Run time error:", ErrorMessage)
-    elif ErrorMessage == "Overflow":
-        print("Run time error:", ErrorMessage)
-    else:
-        print("Run time error:", ErrorMessage)
-        Registers[ERR] = 1
+    print("Run time error:", ErrorMessage)
+    Registers[ERR] = 1
     return Registers
 
 
@@ -304,18 +299,15 @@ def ExecuteLDAimm(Registers, Operand):
 def ExecuteADD(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] + Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("001"):
         ReportRunTimeError("Overflow", Registers)
-    elif Registers[STATUS] == ConvertToDecimal("0011"):
-        ReportRunTimeError("Carry", Registers)
-
     return Registers
 
 
 def ExecuteSUB(Memory, Registers, Address):
     Registers[ACC] = Registers[ACC] - Memory[Address].OperandValue
     Registers = SetFlags(Registers[ACC], Registers)
-    if Registers[STATUS] == ConvertToDecimal("0010"):
+    if Registers[STATUS] == ConvertToDecimal("001"):
         ReportRunTimeError("Overflow", Registers)
     return Registers
 
@@ -377,6 +369,9 @@ def Execute(SourceCode, Memory):
     DisplayCurrentState(SourceCode, Memory, Registers)
     OpCode = Memory[Registers[PC]].OpCode
     while OpCode != "HLT":
+        if int(SourceCode[0]) == Registers[TOS]:
+            print("error")
+            break
         FrameNumber += 1
         print()
         DisplayFrameDelimiter(FrameNumber)
@@ -405,7 +400,7 @@ def Execute(SourceCode, Memory):
             ExecuteSKP()
         elif OpCode == "RTN":
             Registers = ExecuteRTN(Memory, Registers)
-        if Registers[ERR] == 0:
+        if Registers[ERR] == 0 and OpCode != "HLT":
             OpCode = Memory[Registers[PC]].OpCode
             DisplayCurrentState(SourceCode, Memory, Registers)
         else:
@@ -423,7 +418,7 @@ def AssemblerSimulator():
         DisplayMenu()
         MenuOption = GetMenuOption()
         if MenuOption == 'L':
-            SourceCode = LoadFile(SourceCode)
+            SourceCode, MaxLin = LoadFile(SourceCode)
             Memory = ResetMemory(Memory)
         elif MenuOption == 'D':
             if SourceCode[0] == EMPTY_STRING:
@@ -434,7 +429,7 @@ def AssemblerSimulator():
             if SourceCode[0] == EMPTY_STRING:
                 print("Error Code 8")
             else:
-                SourceCode = EditSourceCode(SourceCode)
+                SourceCode = EditSourceCode(SourceCode, MaxLin)
                 Memory = ResetMemory(Memory)
         elif MenuOption == 'A':
             if SourceCode[0] == EMPTY_STRING:
